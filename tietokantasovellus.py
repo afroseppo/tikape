@@ -1,5 +1,7 @@
 import sqlite3
 from datetime import datetime
+import random
+import time
 
 
 # luodaan sqlite3 tietokantayhteys
@@ -190,7 +192,59 @@ def hae_tapahtumat_pvm():
         print("VIRHE!")
 
 def suorita_tehokkuustesti():
-    pass
+
+    start = time.time()
+
+    c.execute("BEGIN TRANSACTION;")
+
+    paikat = []
+    asiakkaat = []
+
+    # luo 1000 paikkaa (P1 jne)
+
+    for i in range(1000):
+        paikka = f'P{i + 1}'
+        paikat.append(paikka)
+        c.execute("INSERT INTO Paikka (nimi) VALUES(?)", [paikka])
+
+    # luo 1000 asiakasta A1 jne.
+
+    for i in range(1000):
+        asiakas = f'A{i + 1}'
+        asiakkaat.append(asiakas)
+        c.execute("INSERT INTO Asiakas (nimi) VALUES(?)", [asiakas])
+
+    # luo 1000 pakettia, jokaiselle jokin asiakas
+    for i in range(1000):
+        seurantakoodi = f'F{i}'
+        asiakasid = random.randint(1,1000)
+        c.execute("INSERT INTO Paketti (asiakas_id, seurantakoodi) VALUES(?, ?)", [asiakasid, seurantakoodi])
+
+    # 1000000 tapahtumaa, jokaiselle paketti ja paikka 
+
+    for i in range(1000000):
+        paketti_id = random.randint(1,1000)
+        paikka = random.randint(1, 1000)
+
+        c.execute("INSERT INTO Tapahtuma (paketti_id, paikka_id, aika, kuvaus) VALUES (?, ?, DateTime('now'), ?)", [paketti_id, paikka, " "])
+
+    db.commit()
+
+    # 1000 kyselyä, jossa jonkun asiakkaan pakettien määrä
+    for i in range(1000):
+        pass
+
+    # 1000 kyselyä, jossa jonkun paketin tapahtumien määrä
+    for i in range(1000):
+        pass
 
 
+    end = time.time()
+
+    kesto = end - start
+
+    print(kesto)
+
+
+# Käynnistetään tietokantasovelluksen UI
 UI()
