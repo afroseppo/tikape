@@ -4,15 +4,16 @@ import random
 import time
 
 
-# luodaan sqlite3 tietokantayhteys
-db = sqlite3.connect('testi.db')
-db.isolation_level = None
+def luo_yhteys_kantaan(nimi):
+    # luodaan sqlite3 tietokantayhteys
+    db = sqlite3.connect(nimi)
+    db.isolation_level = None
 
-c = db.cursor()
+    c = db.cursor()
+
+    return c, db
 
 # komentorivisovelluksen käyttöliittymä
-
-
 def UI():
     print('''Tervetuloa pakettiseurantatietokantaan. Alla komennot:
     1. Luo tietokanta
@@ -53,18 +54,22 @@ def UI():
             func()
 
 
+
 def luo_tietokanta():
     try:
-        c.execute("CREATE TABLE Paikka (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE)")
-        c.execute("CREATE TABLE Asiakas (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE)")
-        c.execute("CREATE TABLE Tapahtuma (id INTEGER PRIMARY KEY, paketti_id INTEGER REFERENCES Paketti, paikka_id INTEGER REFERENCES Paikka, kuvaus TEXT, aika DATETIME, aikastr TEXT)")
-        c.execute(
-            "CREATE TABLE Paketti (id INTEGER PRIMARY KEY, asiakas_id INTEGER REFERENCES Asiakas, seurantakoodi TEXT UNIQUE)")
+        c.execute("CREATE TABLE Paikka (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+        c.execute("CREATE TABLE Asiakas (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+        c.execute("CREATE TABLE Tapahtuma (id INTEGER PRIMARY KEY, paketti_id INTEGER, paikka_id INTEGER, kuvaus TEXT, aika DATETIME);")
+        c.execute("CREATE TABLE Paketti (id INTEGER PRIMARY KEY, asiakas_id INTEGER, seurantakoodi TEXT UNIQUE);")
+        c.execute("CREATE INDEX idx_asiakas ON Paketti(asiakas_id)")
+        c.execute("CREATE INDEX idx_paketti ON Tapahtuma(paketti_id)")
+        c.execute("CREATE INDEX idx_paikka ON Tapahtuma(paikka_id)")
 
         print('Tietokantaan on luotu seuraavat taulut: Paikka, Asiakas, Tapahtuma sekä Paketti')
 
     except:
         print("Suorituksessa tapahtui virhe.")
+
 
 
 def lisaa_paikka():
@@ -77,6 +82,7 @@ def lisaa_paikka():
         print('Tällä nimellä on jo olemassa paikka.')
 
 
+
 def lisaa_asiakas():
     asiakas = input("Anna asiakkaan nimi: ")
 
@@ -87,10 +93,12 @@ def lisaa_asiakas():
         print('Tällä nimellä on jo asiakas.')
 
 
+
 def lisaa_paketti():
     seurantakoodi = input("Anna paketin seurantakoodi: ")
     asiakas = input("Anna asiakkaan nimi: ")
 
+    #haetaan tarkistusta varten Asiakas-taulustaa halutulla nimellä. Jos nimeä ei löydy, tulostetaan virhe. Muutoin jatketaan
     c.execute("SELECT id FROM Asiakas where nimi=?", [asiakas])
     asiakasid = c.fetchone()
 
@@ -107,6 +115,7 @@ def lisaa_paketti():
 
 
 def lisaa_tapahtuma():
+    #haetaan seurantakoodi ja annetaan virheilmoitus, jos seurantakoodia ei löydy
     seurantakoodi = input("Anna paketin seurantakoodi: ")
 
     c.execute("SELECT id FROM Paketti WHERE seurantakoodi=?", [seurantakoodi])
@@ -115,6 +124,7 @@ def lisaa_tapahtuma():
     if paketti_id == None:
         print("VIRHE: Seurantakoodia ei löydy!")
     else:
+        #haetaan paikka ja annetaan virheilmoitus, jos paikkaa ei löydy
         paikka = input("Anna paikka: ")
         c.execute("SELECT id FROM Paikka where nimi=?", [paikka])
         paikka_id = c.fetchone()
@@ -193,32 +203,68 @@ def hae_tapahtumat_pvm():
 
 def suorita_tehokkuustesti():
 
+    #tehokkuustesti indeksillä
+    print("Tehokkuustesti indeksillä")
+    tehokkuustesti('testi1.db', True)
+
+    #tehokkuustesti ilman indeksiä
+    print("Tehokkuustesti ilman indeksiä")
+    tehokkuustesti('testi2.db', False)
+
+def tehokkuustesti(nimi, indeksi):
+
+    #Luodaan uusi tietokantayhteys (ja tietokanta) annetulla nimellä. Jos parametri indeksi on True, luodaa tietokannan tauluihin indeksointi.
+    c1, db1 = luo_yhteys_kantaan(nimi)
+
+    if indeksi:
+        try:
+            c1.execute("CREATE TABLE Paikka (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+            c1.execute("CREATE TABLE Asiakas (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+            c1.execute("CREATE TABLE Tapahtuma (id INTEGER PRIMARY KEY, paketti_id INTEGER, paikka_id INTEGER, kuvaus TEXT, aika DATETIME);")
+            c1.execute("CREATE TABLE Paketti (id INTEGER PRIMARY KEY, asiakas_id INTEGER, seurantakoodi TEXT UNIQUE);")
+            c1.execute("CREATE INDEX idx_asiakas ON Paketti(asiakas_id)")
+            c1.execute("CREATE INDEX idx_paketti ON Tapahtuma(paketti_id)")
+            c1.execute("CREATE INDEX idx_paikka ON Tapahtuma(paikka_id)")
+        except:
+            print("Suorituksessa tapahtui virhe.")
+    else:
+        try:
+            c1.execute("CREATE TABLE Paikka (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+            c1.execute("CREATE TABLE Asiakas (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);")
+            c1.execute("CREATE TABLE Tapahtuma (id INTEGER PRIMARY KEY, paketti_id INTEGER, paikka_id INTEGER, kuvaus TEXT, aika DATETIME);")
+            c1.execute("CREATE TABLE Paketti (id INTEGER PRIMARY KEY, asiakas_id INTEGER, seurantakoodi TEXT UNIQUE);")
+
+        except:
+            print("Suorituksessa tapahtui virhe.")
+
     start = time.time()
 
-    c.execute("BEGIN TRANSACTION;")
+    c1.execute("BEGIN TRANSACTION;")
 
     paikat = []
     asiakkaat = []
+    paketit = []
 
     # luo 1000 paikkaa (P1 jne)
 
     for i in range(1000):
         paikka = f'P{i + 1}'
         paikat.append(paikka)
-        c.execute("INSERT INTO Paikka (nimi) VALUES(?)", [paikka])
+        c1.execute("INSERT INTO Paikka (nimi) VALUES(?)", [paikka])
 
     # luo 1000 asiakasta A1 jne.
 
     for i in range(1000):
         asiakas = f'A{i + 1}'
         asiakkaat.append(asiakas)
-        c.execute("INSERT INTO Asiakas (nimi) VALUES(?)", [asiakas])
+        c1.execute("INSERT INTO Asiakas (nimi) VALUES(?)", [asiakas])
 
     # luo 1000 pakettia, jokaiselle jokin asiakas
     for i in range(1000):
         seurantakoodi = f'F{i}'
         asiakasid = random.randint(1,1000)
-        c.execute("INSERT INTO Paketti (asiakas_id, seurantakoodi) VALUES(?, ?)", [asiakasid, seurantakoodi])
+        paketit.append(seurantakoodi)
+        c1.execute("INSERT INTO Paketti (asiakas_id, seurantakoodi) VALUES(?, ?)", [asiakasid, seurantakoodi])
 
     # 1000000 tapahtumaa, jokaiselle paketti ja paikka 
 
@@ -226,17 +272,22 @@ def suorita_tehokkuustesti():
         paketti_id = random.randint(1,1000)
         paikka = random.randint(1, 1000)
 
-        c.execute("INSERT INTO Tapahtuma (paketti_id, paikka_id, aika, kuvaus) VALUES (?, ?, DateTime('now'), ?)", [paketti_id, paikka, " "])
+        c1.execute("INSERT INTO Tapahtuma (paketti_id, paikka_id, aika, kuvaus) VALUES (?, ?, DateTime('now'), ?)", [paketti_id, paikka, " "])
 
-    db.commit()
+    db1.commit()
 
     # 1000 kyselyä, jossa jonkun asiakkaan pakettien määrä
     for i in range(1000):
-        pass
+        asiakasid = asiakkaat[random.randint(0,999)]
+
+        c1.execute("SELECT count(p.id) from Paketti p left join Asiakas a on p.asiakas_id = a.id where a.nimi=?", [asiakas])
 
     # 1000 kyselyä, jossa jonkun paketin tapahtumien määrä
     for i in range(1000):
-        pass
+        id = random.randint(0, 999)
+        seurantakoodi = paketit[id]
+
+        c1.execute("SELECT count(t.id) from Tapahtuma t left join Paketti p on t.paketti_id = p.id where p.seurantakoodi=?", [seurantakoodi])
 
 
     end = time.time()
@@ -247,4 +298,10 @@ def suorita_tehokkuustesti():
 
 
 # Käynnistetään tietokantasovelluksen UI
+
+db = sqlite3.connect('testi.db')
+db.isolation_level = None
+
+c = db.cursor()
+
 UI()

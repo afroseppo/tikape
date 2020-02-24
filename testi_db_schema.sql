@@ -1,0 +1,4 @@
+CREATE TABLE db.Paikka (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);
+CREATE TABLE db.Asiakas (id INTEGER PRIMARY KEY, nimi TEXT UNIQUE);
+CREATE TABLE db.Tapahtuma (id INTEGER PRIMARY KEY, paketti_id INTEGER REFERENCES Paketti, paikka_id INTEGER REFERENCES Paikka, kuvaus TEXT, aika DATETIME, aikastr TEXT);
+CREATE TABLE db.Paketti (id INTEGER PRIMARY KEY, asiakas_id INTEGER REFERENCES Asiakas, seurantakoodi TEXT UNIQUE);
